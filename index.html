@@ -408,10 +408,95 @@
      <p class="section-body">
 	      This bar chart shows the total purchase amount in USD for each of the four product categories, including Clothing, Accessories, Footwear, and Outerwear, aggregated across all 3,900 transactions in the dataset. The bars are sorted from highest to lowest revenue, making it easy to see where customer spending is concentrated at a glance. When we hover over any bar, we will see the exact total for that category.
     </p>
-    <div id='vis'>
+    <div id='vis'></div>
       <script src='https://d3js.org/d3.v7.min.js'></script>
-      <script src='main.js'></script> 
-    </div>
+      <script>
+        let width = 600, height = 400;
+        let margin = { top: 50, bottom: 80, left: 80, right: 30 };
+
+        let svg = d3.select('#vis')
+                    .append('svg')
+                    .attr('width', width)
+                    .attr('height', height)
+                    .style('background', '#f9f9f9');
+
+        let chartData = [
+          { category: "Clothing",    total: 104264 },
+          { category: "Accessories", total: 74200  },
+          { category: "Footwear",    total: 36093  },
+          { category: "Outerwear",   total: 18524  }
+        ];
+
+        let xScale = d3.scaleBand()
+            .domain(chartData.map(d => d.category))
+            .range([margin.left, width - margin.right])
+            .padding(0.3);
+
+        let yScale = d3.scaleLinear()
+            .domain([0, d3.max(chartData, d => d.total)])
+            .range([height - margin.bottom, margin.top]);
+
+        let colorScale = d3.scaleOrdinal()
+            .domain(["Clothing", "Footwear", "Outerwear", "Accessories"])
+            .range(["#440154", "#31688e", "#35b779", "#fde725"]);
+
+        let xAxis = svg.append('g')
+            .call(d3.axisBottom().scale(xScale))
+            .attr('transform', `translate(0, ${height - margin.bottom})`);
+
+        xAxis.selectAll('text')
+            .attr('transform', 'rotate(-25)')
+            .style('text-anchor', 'end');
+
+        svg.append('g')
+            .call(d3.axisLeft().scale(yScale))
+            .attr('transform', `translate(${margin.left}, 0)`);
+
+        svg.append('text')
+            .attr('x', width / 2)
+            .attr('y', height - 10)
+            .text('Category')
+            .style('text-anchor', 'middle')
+            .style('font-family', 'Arial')
+            .style('font-size', '14px');
+
+        svg.append('text')
+            .attr('x', 0 - height / 2)
+            .attr('y', 20)
+            .text('Purchase Amount (USD)')
+            .style('text-anchor', 'middle')
+            .style('font-family', 'Arial')
+            .style('font-size', '14px')
+            .attr('transform', 'rotate(-90)');
+
+        let bars = svg.selectAll('rect')
+            .data(chartData)
+            .enter()
+            .append('rect')
+            .attr('x', d => xScale(d.category))
+            .attr('y', d => yScale(d.total))
+            .attr('width', xScale.bandwidth())
+            .attr('height', d => height - margin.bottom - yScale(d.total))
+            .attr('fill', d => colorScale(d.category));
+
+        bars
+            .on('mouseover', function(event, d) {
+              d3.select(this).transition().duration(200).style('fill', 'red');
+              svg.append('text')
+                  .attr('id', 'tooltip')
+                  .attr('x', xScale(d.category) + xScale.bandwidth() / 2)
+                  .attr('y', yScale(d.total) - 10)
+                  .text('$' + d.total.toLocaleString())
+                  .style('text-anchor', 'middle')
+                  .style('font-family', 'Arial')
+                  .style('font-size', '13px')
+                  .style('font-weight', 'bold');
+            })
+            .on('mouseout', function(event, d) {
+              d3.select(this).transition().duration(200).style('fill', colorScale(d.category));
+              svg.select('#tooltip').remove();
+            });
+      </script>
       <p class="section-body">
 	      Clothing is the dominant revenue category by a significant margin, generating $104,264 in total purchases, it is nearly 45% of all revenue across the dataset. Accessories follow at $74,220, about 32%, making these two categories together responsible for over three-quarters of total spending. Footwear contributes $36,093 (15.5%), while Outerwear trails considerably at just $18,524 (less than 8%) of total revenue. The gap between Clothing and Outerwear is striking: customers spend more than 5 times as much on Clothing as they do on Outerwear. For a fashion retailer, this signals a clear priority: Clothing and Accessories are the revenue engines and deserve the most inventory investment and promotional attention. Outerwear's low share likely reflects its seasonal and infrequent purchase nature, but also raises the question of whether it is being marketed effectively or priced appropriately to drive more volume. 
       </p>
