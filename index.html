@@ -409,94 +409,207 @@
 	      This bar chart shows the total purchase amount in USD for each of the four product categories, including Clothing, Accessories, Footwear, and Outerwear, aggregated across all 3,900 transactions in the dataset. The bars are sorted from highest to lowest revenue, making it easy to see where customer spending is concentrated at a glance. When we hover over any bar, we will see the exact total for that category.
     </p>
     <div id='vis'></div>
-      <script src='https://d3js.org/d3.v7.min.js'></script>
-      <script>
-        let width = 600, height = 400;
-        let margin = { top: 50, bottom: 80, left: 80, right: 30 };
+<script src='https://d3js.org/d3.v7.min.js'></script>
+<script>
+  const BAR_COLORS = {
+    Clothing:    '#E15759',
+    Accessories: '#4E79A7',
+    Footwear:    '#F28E2B',
+    Outerwear:   '#B07AA1'
+  };
 
-        let svg = d3.select('#vis')
-                    .append('svg')
-                    .attr('width', width)
-                    .attr('height', height)
-                    .style('background', '#f9f9f9');
+  const BAR_COLORS_HOVER = {
+    Clothing:    '#a83d3f',
+    Accessories: '#335880',
+    Footwear:    '#b5691e',
+    Outerwear:   '#7d5572'
+  };
 
-        let chartData = [
-          { category: "Clothing",    total: 104264 },
-          { category: "Accessories", total: 74200  },
-          { category: "Footwear",    total: 36093  },
-          { category: "Outerwear",   total: 18524  }
-        ];
+  const width = 600, height = 400;
+  const margin = { top: 50, bottom: 80, left: 90, right: 30 };
 
-        let xScale = d3.scaleBand()
-            .domain(chartData.map(d => d.category))
-            .range([margin.left, width - margin.right])
-            .padding(0.3);
+  const chartData = [
+    { category: "Clothing",    total: 104264 },
+    { category: "Accessories", total: 74200  },
+    { category: "Footwear",    total: 36093  },
+    { category: "Outerwear",   total: 18524  }
+  ];
 
-        let yScale = d3.scaleLinear()
-            .domain([0, d3.max(chartData, d => d.total)])
-            .range([height - margin.bottom, margin.top]);
+  const subData = {
+    "Clothing": [
+      { item: "Blouse",  total: 10410 },
+      { item: "Shirt",   total: 10332 },
+      { item: "Dress",   total: 10320 },
+      { item: "Pants",   total: 10090 },
+      { item: "Sweater", total:  9462 },
+      { item: "Shorts",  total:  9433 },
+      { item: "Skirt",   total:  9402 },
+      { item: "Socks",   total:  9252 },
+      { item: "T-shirt", total:  9248 },
+      { item: "Hoodie",  total:  8767 },
+      { item: "Jeans",   total:  7548 }
+    ],
+    "Accessories": [
+      { item: "Jewelry",    total: 10010 },
+      { item: "Sunglasses", total:  9649 },
+      { item: "Belt",       total:  9635 },
+      { item: "Scarf",      total:  9561 },
+      { item: "Hat",        total:  9375 },
+      { item: "Handbag",    total:  8857 },
+      { item: "Backpack",   total:  8636 },
+      { item: "Gloves",     total:  8477 }
+    ],
+    "Footwear": [
+      { item: "Shoes",    total: 9240 },
+      { item: "Sandals",  total: 9200 },
+      { item: "Boots",    total: 9018 },
+      { item: "Sneakers", total: 8635 }
+    ],
+    "Outerwear": [
+      { item: "Coat",   total: 9275 },
+      { item: "Jacket", total: 9249 }
+    ]
+  };
 
-        let colorScale = d3.scaleOrdinal()
-            .domain(["Clothing", "Footwear", "Outerwear", "Accessories"])
-            .range(["#440154", "#31688e", "#35b779", "#fde725"]);
+  const visDiv = d3.select('#vis');
 
-        let xAxis = svg.append('g')
-            .call(d3.axisBottom().scale(xScale))
-            .attr('transform', `translate(0, ${height - margin.bottom})`);
+  const backBtn = visDiv.append('button')
+    .attr('id', 'back-btn')
+    .text('← Back to Categories')
+    .style('display', 'none')
+    .style('margin-bottom', '8px')
+    .style('padding', '6px 14px')
+    .style('cursor', 'pointer')
+    .style('font-family', 'Arial')
+    .style('font-size', '13px')
+    .style('border', '1px solid #888')
+    .style('border-radius', '4px')
+    .style('background', 'white')
+    .style('color', '#444');
 
-        xAxis.selectAll('text')
-            .attr('transform', 'rotate(-25)')
-            .style('text-anchor', 'end');
+  const svg = visDiv.append('svg')
+    .attr('width', width)
+    .attr('height', height)
+    .style('background', '#f9f9f9');
 
-        svg.append('g')
-            .call(d3.axisLeft().scale(yScale))
-            .attr('transform', `translate(${margin.left}, 0)`);
+  // ── currentCategory tracks which category we drilled into ──
+  let currentCategory = null;
 
+  function getColor(d) {
+    const cat = d.category || currentCategory;
+    return BAR_COLORS[cat];
+  }
+
+  function getHoverColor(d) {
+    const cat = d.category || currentCategory;
+    return BAR_COLORS_HOVER[cat];
+  }
+
+  function drawBars(data, xLabel, titleText, clickable) {
+    svg.selectAll('*').remove();
+
+    const xScale = d3.scaleBand()
+      .domain(data.map(d => d.item || d.category))
+      .range([margin.left, width - margin.right])
+      .padding(0.3);
+
+    const yScale = d3.scaleLinear()
+      .domain([0, d3.max(data, d => d.total)])
+      .nice()
+      .range([height - margin.bottom, margin.top]);
+
+    // Title
+    svg.append('text')
+      .attr('x', width / 2).attr('y', 28)
+      .text(titleText)
+      .style('text-anchor', 'middle')
+      .style('font-family', 'Arial')
+      .style('font-size', '14px')
+      .style('font-weight', 'bold');
+
+    // Axes
+    svg.append('g')
+      .call(d3.axisBottom(xScale))
+      .attr('transform', `translate(0, ${height - margin.bottom})`)
+      .selectAll('text')
+      .attr('transform', 'rotate(-30)')
+      .style('text-anchor', 'end')
+      .style('font-size', '12px');
+
+    svg.append('g')
+      .call(d3.axisLeft(yScale).tickFormat(d => '$' + d.toLocaleString()))
+      .attr('transform', `translate(${margin.left}, 0)`);
+
+    // Axis labels
+    svg.append('text')
+      .attr('x', width / 2).attr('y', height - 5)
+      .text(xLabel)
+      .style('text-anchor', 'middle')
+      .style('font-family', 'Arial').style('font-size', '13px');
+
+    svg.append('text')
+      .attr('transform', 'rotate(-90)')
+      .attr('x', -(height / 2)).attr('y', 18)
+      .text('Purchase Amount (USD)')
+      .style('text-anchor', 'middle')
+      .style('font-family', 'Arial').style('font-size', '13px');
+
+    // Click hint (category view only)
+    if (clickable) {
+      svg.append('text')
+        .attr('x', width - margin.right).attr('y', margin.top - 10)
+        .text('Click a bar to see item breakdown →')
+        .style('text-anchor', 'end')
+        .style('font-family', 'Arial').style('font-size', '11px')
+        .style('fill', '#888').style('font-style', 'italic');
+    }
+
+    // Bars
+    const bars = svg.selectAll('rect')
+      .data(data).enter().append('rect')
+      .attr('x', d => xScale(d.item || d.category))
+      .attr('y', d => yScale(d.total))
+      .attr('width', xScale.bandwidth())
+      .attr('height', d => height - margin.bottom - yScale(d.total))
+      .attr('fill', d => getColor(d))
+      .style('cursor', clickable ? 'pointer' : 'default');
+
+    bars
+      .on('mouseover', function(event, d) {
+        d3.select(this).transition().duration(150)
+          .style('fill', getHoverColor(d));
         svg.append('text')
-            .attr('x', width / 2)
-            .attr('y', height - 10)
-            .text('Category')
-            .style('text-anchor', 'middle')
-            .style('font-family', 'Arial')
-            .style('font-size', '14px');
+          .attr('id', 'tooltip')
+          .attr('x', xScale(d.item || d.category) + xScale.bandwidth() / 2)
+          .attr('y', yScale(d.total) - 8)
+          .text('$' + d.total.toLocaleString())
+          .style('text-anchor', 'middle')
+          .style('font-family', 'Arial')
+          .style('font-size', '13px')
+          .style('font-weight', 'bold');
+      })
+      .on('mouseout', function(event, d) {
+        d3.select(this).transition().duration(150)
+          .style('fill', getColor(d));
+        svg.select('#tooltip').remove();
+      })
+      .on('click', function(event, d) {
+        if (!clickable) return;
+        currentCategory = d.category;
+        backBtn.style('display', 'inline-block');
+        drawBars(subData[d.category], 'Item', `${d.category} — Item Revenue Ranking`, false);
+      });
+  }
 
-        svg.append('text')
-            .attr('x', 0 - height / 2)
-            .attr('y', 20)
-            .text('Purchase Amount (USD)')
-            .style('text-anchor', 'middle')
-            .style('font-family', 'Arial')
-            .style('font-size', '14px')
-            .attr('transform', 'rotate(-90)');
+  backBtn.on('click', () => {
+    currentCategory = null;
+    backBtn.style('display', 'none');
+    drawBars(chartData, 'Category', 'Total Revenue by Product Category', true);
+  });
 
-        let bars = svg.selectAll('rect')
-            .data(chartData)
-            .enter()
-            .append('rect')
-            .attr('x', d => xScale(d.category))
-            .attr('y', d => yScale(d.total))
-            .attr('width', xScale.bandwidth())
-            .attr('height', d => height - margin.bottom - yScale(d.total))
-            .attr('fill', d => colorScale(d.category));
-
-        bars
-            .on('mouseover', function(event, d) {
-              d3.select(this).transition().duration(200).style('fill', 'red');
-              svg.append('text')
-                  .attr('id', 'tooltip')
-                  .attr('x', xScale(d.category) + xScale.bandwidth() / 2)
-                  .attr('y', yScale(d.total) - 10)
-                  .text('$' + d.total.toLocaleString())
-                  .style('text-anchor', 'middle')
-                  .style('font-family', 'Arial')
-                  .style('font-size', '13px')
-                  .style('font-weight', 'bold');
-            })
-            .on('mouseout', function(event, d) {
-              d3.select(this).transition().duration(200).style('fill', colorScale(d.category));
-              svg.select('#tooltip').remove();
-            });
-      </script>
+  // Initial render
+  drawBars(chartData, 'Category', 'Total Revenue by Product Category', true);
+</script>
       <p class="section-body">
 	      Clothing is the dominant revenue category by a significant margin, generating $104,264 in total purchases, it is nearly 45% of all revenue across the dataset. Accessories follow at $74,220, about 32%, making these two categories together responsible for over three-quarters of total spending. Footwear contributes $36,093 (15.5%), while Outerwear trails considerably at just $18,524 (less than 8%) of total revenue. The gap between Clothing and Outerwear is striking: customers spend more than 5 times as much on Clothing as they do on Outerwear. For a fashion retailer, this signals a clear priority: Clothing and Accessories are the revenue engines and deserve the most inventory investment and promotional attention. Outerwear's low share likely reflects its seasonal and infrequent purchase nature, but also raises the question of whether it is being marketed effectively or priced appropriately to drive more volume. 
       </p>
@@ -506,7 +619,6 @@
 
       </p>
 </section> 
-
 <!-- ═══════════ VIZ 3 — BOXPLOT ═══════════ -->
 <section id="viz3">
   <div class="container">
